@@ -8,7 +8,8 @@ from pathlib import Path
 
 
 IMAGE_PLACEHOLDER_PATTERN = re.compile(r"\[이미지\s*필요\s*(\d+)\s*:\s*.*?\]", re.DOTALL)
-FORMULA_PATTERN = re.compile(r"#\$(.*?)\$#", re.DOTALL)
+BRACKET_FORMULA_PATTERN = re.compile(r"\[수식\s*:\s*(.*?)\]", re.DOTALL)
+LEGACY_FORMULA_PATTERN = re.compile(r"#\$(.*?)\$#", re.DOTALL)
 QUESTION_START_PATTERN = re.compile(r"^\s*문항\s*\d+\s*[\.\)]?", re.IGNORECASE)
 SUPPORTED_IMAGE_SUFFIXES = (".PNG", ".png", ".JPG", ".jpg", ".JPEG", ".jpeg", ".BMP", ".bmp")
 
@@ -56,7 +57,11 @@ def find_image_path(txt_path: Path, image_index: int) -> Path:
 def iter_inline_tokens(text: str) -> list[Token]:
     tokens: list[Token] = []
     pattern = re.compile(
-        f"{IMAGE_PLACEHOLDER_PATTERN.pattern}|{FORMULA_PATTERN.pattern}",
+        (
+            f"{IMAGE_PLACEHOLDER_PATTERN.pattern}|"
+            f"{BRACKET_FORMULA_PATTERN.pattern}|"
+            f"{LEGACY_FORMULA_PATTERN.pattern}"
+        ),
         re.DOTALL,
     )
     last_end = 0
@@ -69,7 +74,9 @@ def iter_inline_tokens(text: str) -> list[Token]:
         if image_match is not None:
             tokens.append(ImageToken("image", int(image_match.group(1))))
         else:
-            formula_match = FORMULA_PATTERN.fullmatch(match.group(0))
+            formula_match = BRACKET_FORMULA_PATTERN.fullmatch(match.group(0))
+            if formula_match is None:
+                formula_match = LEGACY_FORMULA_PATTERN.fullmatch(match.group(0))
             formula = "" if formula_match is None else formula_match.group(1).strip()
             if formula:
                 tokens.append(FormulaToken("formula", normalize_formula(formula)))
