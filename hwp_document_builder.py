@@ -225,7 +225,7 @@ class HwpWriter:
     def insert_image(self, image_path: Path) -> None:
         image = str(image_path.resolve())
         try:
-            self.hwp.InsertPicture(image, True, 1, False, False, 0, 0, 0)
+            self.hwp.InsertPicture(image, True, 0, False, False, 0, 0, 0)
             return
         except Exception:
             pass
