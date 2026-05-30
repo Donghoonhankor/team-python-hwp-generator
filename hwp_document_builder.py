@@ -11,7 +11,7 @@ IMAGE_PLACEHOLDER_PATTERN = re.compile(r"\[이미지\s*필요\s*(\d+)\s*:\s*.*?\
 BRACKET_FORMULA_PATTERN = re.compile(r"\[수식\s*:\s*(.*?)\]", re.DOTALL)
 LEGACY_FORMULA_PATTERN = re.compile(r"#\$(.*?)\$#", re.DOTALL)
 QUESTION_START_PATTERN = re.compile(r"^\s*문항\s*\d+\s*[\.\)]?", re.IGNORECASE)
-SUPPORTED_IMAGE_SUFFIXES = (".PNG", ".png", ".JPG", ".jpg", ".JPEG", ".jpeg", ".BMP", ".bmp")
+SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp"}
 
 
 @dataclass(frozen=True)
@@ -45,13 +45,43 @@ def find_image_path(txt_path: Path, image_index: int) -> Path:
         stems.append(txt_path.stem[: -len("_이미지번호매칭")])
 
     for stem in stems:
-        for suffix in SUPPORTED_IMAGE_SUFFIXES:
+        for suffix in sorted(SUPPORTED_IMAGE_SUFFIXES):
+            candidate = txt_path.with_name(f"{stem}_이미지{image_index}{suffix.upper()}")
+            if candidate.exists():
+                return candidate
             candidate = txt_path.with_name(f"{stem}_이미지{image_index}{suffix}")
             if candidate.exists():
                 return candidate
 
+    fallback_names = [
+        f"이미지{image_index}",
+        f"image{image_index}",
+        f"Image{image_index}",
+        f"그림{image_index}",
+    ]
+    for name in fallback_names:
+        for suffix in sorted(SUPPORTED_IMAGE_SUFFIXES):
+            candidate = txt_path.with_name(f"{name}{suffix.upper()}")
+            if candidate.exists():
+                return candidate
+            candidate = txt_path.with_name(f"{name}{suffix}")
+            if candidate.exists():
+                return candidate
+
+    numbered_patterns = [
+        f"*이미지{image_index}*",
+        f"*image{image_index}*",
+        f"*Image{image_index}*",
+        f"*그림{image_index}*",
+    ]
+    for pattern in numbered_patterns:
+        for candidate in sorted(txt_path.parent.glob(pattern)):
+            if candidate.is_file() and candidate.suffix.lower() in SUPPORTED_IMAGE_SUFFIXES:
+                return candidate
+
     searched = ", ".join(f"{stem}_이미지{image_index}.*" for stem in stems)
-    raise FileNotFoundError(f"이미지 {image_index} 파일을 찾을 수 없습니다. 찾은 이름: {searched}")
+    fallback = ", 이미지{0}.*, image{0}.*, 그림{0}.*".format(image_index)
+    raise FileNotFoundError(f"이미지 {image_index} 파일을 찾을 수 없습니다. 찾은 이름: {searched}{fallback}")
 
 
 def iter_inline_tokens(text: str) -> list[Token]:
